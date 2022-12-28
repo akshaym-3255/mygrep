@@ -1,7 +1,7 @@
 package main
 
-import "fmt"
+import "github.com/akshaym-3255/mygrep/cmd"
 
 func main() {
-	fmt.Println("mygrep")
+	cmd.Execute()
 }
