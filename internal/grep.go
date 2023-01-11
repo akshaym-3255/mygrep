@@ -2,7 +2,6 @@ package internal
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -66,13 +65,12 @@ func (g *Grep) matchPatternInDir(dirName string, pattern string) {
 	if dirName == "" || dirName == "." {
 		dirName, _ = os.Getwd()
 	}
+
 	err := filepath.Walk(dirName, func(path string, info os.FileInfo, err error) error {
-		if info != nil {
-			if !info.IsDir() {
-				g.matchPatternInFile(path, pattern)
-			}
+		if !info.IsDir() {
+			g.matchPatternInFile(path, pattern)
 		}
-		return errors.New("check the directory name")
+		return nil
 	})
 	fmt.Println(err)
 }
@@ -110,7 +108,7 @@ func (g *Grep) WriteOutput(path string, lines []string, matchedLines []string) {
 
 func (g *Grep) writeOutputToFile(path string, lines []string, matchedLines []string) {
 	outputFileName := g.OutputFile
-	f, err := os.Create(outputFileName)
+	f, err := os.OpenFile(outputFileName, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0777)
 
 	if err != nil {
 		fmt.Println(err.Error())
