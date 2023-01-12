@@ -48,7 +48,12 @@ var rootCmd = &cobra.Command{
 			OutputFile:      outPutFile,
 		}
 
-		grepCommand.MatchPattern()
+		matchedLines, err := grepCommand.MatchPattern()
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		grepCommand.WriteOutput(matchedLines)
 	},
 }
 

@@ -2,7 +2,9 @@ package internal
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -18,14 +20,17 @@ type Grep struct {
 	OutputFile      string
 }
 
-func (g *Grep) MatchPattern() {
+func (g *Grep) MatchPattern() ([]string, error) {
+	var err error
+	var matchedLines []string
 	if g.Recursive {
-		g.matchPatternInDir(g.Path, g.Pattern)
+		matchedLines, err = g.matchPatternInDir(g.Path, g.Pattern)
 	} else if g.ReadFromStdIn {
-		g.matchPatternInStdIn(g.Pattern)
+		matchedLines = g.matchPatternInStdIn(g.Pattern, os.Stdin)
 	} else {
-		g.matchPatternInFile(g.Path, g.Pattern)
+		matchedLines, err = g.matchPatternInFile(g.Path, g.Pattern)
 	}
+	return matchedLines, err
 }
 
 func (g *Grep) CheckMatch(lines []string, pattern string) []string {
@@ -46,38 +51,51 @@ func (g *Grep) CheckMatch(lines []string, pattern string) []string {
 	return matchedLines
 }
 
-func (g *Grep) matchPatternInFile(path string, pattern string) {
+func (g *Grep) matchPatternInFile(path string, pattern string) ([]string, error) {
 	content, err := os.ReadFile(path)
 
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		return nil, err
 	}
 	con := string(content)
 	lines := strings.Split(con, "\n")
 
 	matchedLines := g.CheckMatch(lines, pattern)
-	g.WriteOutput(path, lines, matchedLines)
+	return matchedLines, nil
 }
 
-func (g *Grep) matchPatternInDir(dirName string, pattern string) {
+func (g *Grep) matchPatternInDir(dirName string, pattern string) ([]string, error) {
 
 	if dirName == "" || dirName == "." {
 		dirName, _ = os.Getwd()
 	}
+	if _, err := os.Stat(dirName); os.IsNotExist(err) {
+		return nil, errors.New("directory not present")
+	}
 
+	var matchedLinesInDir []string
 	err := filepath.Walk(dirName, func(path string, info os.FileInfo, err error) error {
 		if !info.IsDir() {
-			g.matchPatternInFile(path, pattern)
+			matchedLines, err := g.matchPatternInFile(path, pattern)
+			if err != nil {
+				return err
+			}
+			for _, line := range matchedLines {
+				matchWithPath := path + "   " + line
+				matchedLinesInDir = append(matchedLinesInDir, matchWithPath)
+			}
 		}
 		return nil
 	})
-	fmt.Println(err)
+	if err != nil {
+		return nil, err
+	}
+	return matchedLinesInDir, nil
 }
 
-func (g *Grep) matchPatternInStdIn(pattern string) {
+func (g *Grep) matchPatternInStdIn(pattern string, reader io.Reader) []string {
 
-	scanner := bufio.NewScanner(os.Stdin)
+	scanner := bufio.NewScanner(reader)
 	var lines []string
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -87,28 +105,24 @@ func (g *Grep) matchPatternInStdIn(pattern string) {
 		lines = append(lines, line)
 	}
 	matchedLines := g.CheckMatch(lines, pattern)
-	g.WriteOutput("", lines, matchedLines)
-
+	return matchedLines
 }
 
-func (g *Grep) WriteOutput(path string, lines []string, matchedLines []string) {
+func (g *Grep) WriteOutput(matchedLines []string) {
 
 	if g.OutputFile != "" {
-		g.writeOutputToFile(path, lines, matchedLines)
+		g.writeOutputToFile(matchedLines)
 		return
 	}
 
 	for _, line := range matchedLines {
-		if g.Recursive {
-			fmt.Print(path + "  ")
-		}
 		fmt.Println(line)
 	}
 }
 
-func (g *Grep) writeOutputToFile(path string, lines []string, matchedLines []string) {
+func (g *Grep) writeOutputToFile(matchedLines []string) {
 	outputFileName := g.OutputFile
-	f, err := os.OpenFile(outputFileName, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0777)
+	f, err := os.Create(outputFileName)
 
 	if err != nil {
 		fmt.Println(err.Error())
@@ -116,12 +130,8 @@ func (g *Grep) writeOutputToFile(path string, lines []string, matchedLines []str
 	}
 	defer f.Close()
 	for _, line := range matchedLines {
-		stringToWrite := ""
-		if g.Recursive {
-			stringToWrite = path + "   " + line + "\n"
-		} else {
-			stringToWrite = line + "\n"
-		}
+		stringToWrite := line + "\n"
+
 		_, err2 := f.WriteString(stringToWrite)
 		if err2 != nil {
 			log.Fatal(err2)
