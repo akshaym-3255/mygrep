@@ -2,7 +2,6 @@ package internal
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -87,7 +86,7 @@ func TestGrep_matchPatternInFile(t *testing.T) {
 			}
 			matchedLines, err := g.matchPatternInFile()
 			if err != nil {
-				fmt.Println(err.Error())
+				assert.Contains(t, tt.WantErr.Error(), err.Error())
 			} else {
 				assert.Equal(t, tt.want, matchedLines)
 			}
@@ -193,7 +192,6 @@ func TestGrep_WriteOutput(t *testing.T) {
 			content, _ := os.ReadFile(tt.fields.OutputFile)
 			con := string(content)
 			lines := strings.Split(con, "\n")
-			fmt.Println(lines)
 			assert.Equal(t, 2, len(lines)-1)
 			assert.Equal(t, []string{"abc", "abcd"}, tt.args.matchedLines)
 

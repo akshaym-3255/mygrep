@@ -54,3 +54,12 @@ mygrep <pattern> -o=<filename>
 
 ## assumptions
 -r option needed to search in directory
+
+
+## coverage
+```
+akshay->go test -cover
+PASS
+coverage: 76.7% of statements
+ok      github.com/akshaym-3255/mygrep/internal 0.002s
+```
