@@ -1,4 +1,5 @@
 # mygrep
+### grep implementation in golang.
 
 ## Run Locally
 install go (https://go.dev/doc/install)
@@ -43,10 +44,13 @@ mygrep <pattern> -o=<filename>
 
 
 
-#Flags:
+## Flags:
  ```
   -h, --help                help for mygrep
   -i, --insensitive         insensitive match
   -o, --outputFile string   write output to file
   -r, --recursive           recursive search
 ```
+
+## assumptions
+-r option needed to search in directory
