@@ -24,11 +24,11 @@ func (g *Grep) MatchPattern() ([]string, error) {
 	var err error
 	var matchedLines []string
 	if g.Recursive {
-		matchedLines, err = g.matchPatternInDir(g.Path, g.Pattern)
+		matchedLines, err = g.matchPatternInDir()
 	} else if g.ReadFromStdIn {
-		matchedLines = g.matchPatternInStdIn(g.Pattern, os.Stdin)
+		matchedLines = g.matchPatternInStdIn(os.Stdin)
 	} else {
-		matchedLines, err = g.matchPatternInFile(g.Path, g.Pattern)
+		matchedLines, err = g.matchPatternInFile()
 	}
 	return matchedLines, err
 }
@@ -51,8 +51,8 @@ func (g *Grep) CheckMatch(lines []string, pattern string) []string {
 	return matchedLines
 }
 
-func (g *Grep) matchPatternInFile(path string, pattern string) ([]string, error) {
-	content, err := os.ReadFile(path)
+func (g *Grep) matchPatternInFile() ([]string, error) {
+	content, err := os.ReadFile(g.Path)
 
 	if err != nil {
 		return nil, err
@@ -60,12 +60,21 @@ func (g *Grep) matchPatternInFile(path string, pattern string) ([]string, error)
 	con := string(content)
 	lines := strings.Split(con, "\n")
 
-	matchedLines := g.CheckMatch(lines, pattern)
+	matchedLines := g.CheckMatch(lines, g.Pattern)
 	return matchedLines, nil
 }
 
-func (g *Grep) matchPatternInDir(dirName string, pattern string) ([]string, error) {
+func (g *Grep) matchPatternInFileInRoutine(path string, ch chan []string) {
+	content, _ := os.ReadFile(path)
+	con := string(content)
+	lines := strings.Split(con, "\n")
 
+	matchedLines := g.CheckMatch(lines, g.Pattern)
+	ch <- matchedLines
+}
+
+func (g *Grep) matchPatternInDir() ([]string, error) {
+	dirName := g.Path
 	if dirName == "" || dirName == "." {
 		dirName, _ = os.Getwd()
 	}
@@ -76,10 +85,9 @@ func (g *Grep) matchPatternInDir(dirName string, pattern string) ([]string, erro
 	var matchedLinesInDir []string
 	err := filepath.Walk(dirName, func(path string, info os.FileInfo, err error) error {
 		if !info.IsDir() {
-			matchedLines, err := g.matchPatternInFile(path, pattern)
-			if err != nil {
-				return err
-			}
+			ch := make(chan []string)
+			go g.matchPatternInFileInRoutine(path, ch)
+			matchedLines := <-ch
 			for _, line := range matchedLines {
 				matchWithPath := path + "   " + line
 				matchedLinesInDir = append(matchedLinesInDir, matchWithPath)
@@ -93,7 +101,7 @@ func (g *Grep) matchPatternInDir(dirName string, pattern string) ([]string, erro
 	return matchedLinesInDir, nil
 }
 
-func (g *Grep) matchPatternInStdIn(pattern string, reader io.Reader) []string {
+func (g *Grep) matchPatternInStdIn(reader io.Reader) []string {
 
 	scanner := bufio.NewScanner(reader)
 	var lines []string
@@ -104,7 +112,7 @@ func (g *Grep) matchPatternInStdIn(pattern string, reader io.Reader) []string {
 		}
 		lines = append(lines, line)
 	}
-	matchedLines := g.CheckMatch(lines, pattern)
+	matchedLines := g.CheckMatch(lines, g.Pattern)
 	return matchedLines
 }
 
